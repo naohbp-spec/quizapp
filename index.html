@@ -149,11 +149,38 @@ const generateQuizzes = async (keyword, difficulty) => {
 
     const result = await response.json();
     try {
-        let jsonString = result.candidates[0].content.parts[0].text;
-        jsonString = jsonString.replace(/^```json/m, '').replace(/```$/m, '').trim();
-        return JSON.parse(jsonString);
+        const candidates = result.candidates;
+        if (!candidates || candidates.length === 0 || !candidates[0].content || !candidates[0].content.parts || candidates[0].content.parts.length === 0) {
+            console.error("Unexpected API response structure:", result);
+            return [];
+        }
+
+        let jsonString = candidates[0].content.parts[0].text;
+        
+        // コードブロックマーカーを取り除く（より堅牢な正規表現）
+        jsonString = jsonString.replace(/^```(json)?/im, '').replace(/```$/m, '').trim();
+
+        // 最初の '[' と 最後の ']' を見つけて、その間だけを抽出する（余分なテキスト対策）
+        const startIndex = jsonString.indexOf('[');
+        const endIndex = jsonString.lastIndexOf(']');
+        
+        if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+            jsonString = jsonString.substring(startIndex, endIndex + 1);
+        }
+
+        const parsedJson = JSON.parse(jsonString);
+        
+        // 配列であることを確認
+        if (!Array.isArray(parsedJson)) {
+            console.error("Parsed JSON is not an array:", parsedJson);
+            return [];
+        }
+        
+        return parsedJson;
+
     } catch (e) {
         console.error("Failed to parse JSON for difficulty:", difficulty, e);
+        console.error("Raw response text was:", result?.candidates?.[0]?.content?.parts?.[0]?.text);
         return [];
     }
 };
